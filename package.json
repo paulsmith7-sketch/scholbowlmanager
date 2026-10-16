@@ -1,0 +1,16 @@
+{
+  "name": "scholastic-bowl-tournament-manager",
+  "version": "0.1.0",
+  "description": "Offline-first tournament manager for scholastic bowl and quiz bowl.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/serve.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
