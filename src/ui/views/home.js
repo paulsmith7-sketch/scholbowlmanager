@@ -5,7 +5,7 @@ import { listTournaments, loadTournament, saveTournament, deleteTournament } fro
 
 export function homeView(app) {
   const list = listTournaments();
-  const name = h('input', { required: true, placeholder: 'Spring Invitational' });
+  const name = h('input', { placeholder: 'Spring Invitational' });
   const date = h('input', { type: 'date', value: new Date().toISOString().slice(0, 10) });
   const location = h('input', { placeholder: 'Central High School' });
   const preset = select(
@@ -15,7 +15,7 @@ export function homeView(app) {
 
   const create = (e) => {
     e.preventDefault();
-    const t = createTournament({ name: name.value.trim(), date: date.value, location: location.value.trim(), scoringPreset: preset.value });
+    const t = createTournament({ name: name.value.trim() || 'Untitled tournament', date: date.value, location: location.value.trim(), scoringPreset: preset.value });
     saveTournament(t);
     app.navigate(`#/t/${t.id}/setup`);
   };

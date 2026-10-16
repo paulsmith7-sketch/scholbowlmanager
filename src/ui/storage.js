@@ -2,11 +2,35 @@
 import { validateTournament } from '../core/tournament.js';
 
 const INDEX_KEY = 'sbtm:index';
+
+// Some embedded previews do not allow browser storage at all. Fall back to
+// memory so the app still works, and let the UI warn that nothing is saved.
+const memory = new Map();
+const memoryStore = {
+  getItem: (k) => (memory.has(k) ? memory.get(k) : null),
+  setItem: (k, v) => memory.set(k, String(v)),
+  removeItem: (k) => memory.delete(k),
+};
+
+function pickStore() {
+  try {
+    const probe = '__sbtm_probe__';
+    window.localStorage.setItem(probe, '1');
+    window.localStorage.removeItem(probe);
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+const persistent = pickStore();
+export const store = persistent || memoryStore;
+export const storageAvailable = !!persistent;
 const tKey = (id) => `sbtm:t:${id}`;
 
 function readJson(key, fallback) {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = store.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
@@ -23,16 +47,16 @@ export function loadTournament(id) {
 }
 
 export function saveTournament(t) {
-  localStorage.setItem(tKey(t.id), JSON.stringify(t));
+  store.setItem(tKey(t.id), JSON.stringify(t));
   const index = readJson(INDEX_KEY, []).filter((x) => x.id !== t.id);
   index.push({ id: t.id, name: t.name, date: t.date, updatedAt: t.updatedAt, teams: t.teams.length });
-  localStorage.setItem(INDEX_KEY, JSON.stringify(index));
+  store.setItem(INDEX_KEY, JSON.stringify(index));
 }
 
 export function deleteTournament(id) {
-  localStorage.removeItem(tKey(id));
+  store.removeItem(tKey(id));
   const index = readJson(INDEX_KEY, []).filter((x) => x.id !== id);
-  localStorage.setItem(INDEX_KEY, JSON.stringify(index));
+  store.setItem(INDEX_KEY, JSON.stringify(index));
 }
 
 // Asks the browser not to evict our data under storage pressure.

@@ -1,6 +1,6 @@
 // App shell: routing, saving, and the top-level layout.
 import { h, clear, toast } from './dom.js';
-import { loadTournament, saveTournament, requestPersistence } from './storage.js';
+import { loadTournament, saveTournament, requestPersistence, store, storageAvailable } from './storage.js';
 import { homeView } from './views/home.js';
 import { setupView } from './views/setup.js';
 import { phasesView } from './views/phases.js';
@@ -25,9 +25,18 @@ const app = {
   root: null,
 
   navigate(hash, { replace = false } = {}) {
-    if (replace) history.replaceState(null, '', hash);
-    else history.pushState(null, '', hash);
+    // History calls can throw inside sandboxed previews; the hash still works.
+    try {
+      if (replace) history.replaceState(null, '', hash);
+      else history.pushState(null, '', hash);
+    } catch {
+      this.route = hash;
+    }
     this.render();
+  },
+
+  currentHash() {
+    return this.route ?? location.hash;
   },
 
   // Applies a change to the open tournament, saves it, and redraws.
@@ -48,7 +57,7 @@ const app = {
 
   lastBackup() {
     try {
-      return Number(localStorage.getItem(BACKUP_KEY(this.t.id))) || 0;
+      return Number(store.getItem(BACKUP_KEY(this.t.id))) || 0;
     } catch {
       return 0;
     }
@@ -56,7 +65,7 @@ const app = {
 
   markBackedUp() {
     try {
-      localStorage.setItem(BACKUP_KEY(this.t.id), String(Date.now()));
+      store.setItem(BACKUP_KEY(this.t.id), String(Date.now()));
     } catch {
       /* ignore */
     }
@@ -64,8 +73,9 @@ const app = {
   },
 
   render() {
-    const [, route, id, tab = 'games', sub] = location.hash.split('/');
+    const [, route, id, tab = 'games', sub] = this.currentHash().split('/');
     const main = clear(this.root);
+    if (!storageAvailable) main.append(storageWarning());
     document.body.classList.remove('projector');
     if (route !== 't' || !id) {
       this.t = null;
@@ -97,6 +107,11 @@ function header(t, active) {
       : null);
 }
 
+function storageWarning() {
+  return h('div', { class: 'banner no-print', role: 'alert' },
+    h('span', {}, 'This window cannot save anything, so your work is lost when it closes. Download the file and open it in Chrome, Edge, Firefox or Safari instead.'));
+}
+
 function backupNudge(app, tab) {
   const t = app.t;
   if (tab === 'backup') return null;
@@ -109,8 +124,19 @@ function backupNudge(app, tab) {
 
 export function start(root) {
   app.root = root;
-  window.addEventListener('popstate', () => app.render());
-  window.addEventListener('hashchange', () => app.render());
+  const onRouteChange = () => {
+    app.route = null;
+    app.render();
+  };
+  window.addEventListener('popstate', onRouteChange);
+  window.addEventListener('hashchange', onRouteChange);
+  // Links are handled here too, so they work where hash navigation is blocked.
+  root.addEventListener('click', (e) => {
+    const link = e.target.closest('a[href^="#/"]');
+    if (!link || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    e.preventDefault();
+    app.navigate(link.getAttribute('href'));
+  });
   window.addEventListener('online', () => app.render());
   window.addEventListener('offline', () => app.render());
   requestPersistence();

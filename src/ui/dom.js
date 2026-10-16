@@ -5,6 +5,7 @@ export function h(tag, attrs = {}, ...children) {
     if (value === undefined || value === null || value === false) continue;
     if (key === 'class') el.className = value;
     else if (key === 'style' && typeof value === 'object') Object.assign(el.style, value);
+    else if (tag === 'form' && key === 'onsubmit') handleSubmit(el, value);
     else if (key.startsWith('on') && typeof value === 'function') el.addEventListener(key.slice(2).toLowerCase(), value);
     else if (key === 'value') el.value = value;
     else if (key === 'checked' || key === 'selected' || key === 'disabled') el[key] = !!value;
@@ -12,6 +13,27 @@ export function h(tag, attrs = {}, ...children) {
   }
   append(el, children);
   return el;
+}
+
+// Forms are submitted by script rather than natively. Sandboxed previews
+// (such as a file opened inside another app) block native form submission
+// entirely, which would make every button that submits a form do nothing.
+function handleSubmit(form, onsubmit) {
+  const run = (e) => {
+    e.preventDefault();
+    if (typeof form.reportValidity === 'function' && !form.reportValidity()) return;
+    onsubmit(e);
+  };
+  form.addEventListener('click', (e) => {
+    const button = e.target.closest('button');
+    if (button && form.contains(button) && (button.getAttribute('type') || 'submit') === 'submit') run(e);
+  });
+  form.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    const tag = e.target.tagName;
+    if (tag === 'INPUT' && !['checkbox', 'radio', 'button', 'submit', 'file'].includes(e.target.type)) run(e);
+  });
+  form.addEventListener('submit', (e) => e.preventDefault());
 }
 
 function append(el, children) {
